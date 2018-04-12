@@ -1,11 +1,11 @@
 // Copyright 2016 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //      http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,7 +24,8 @@
     cardTemplate: document.querySelector('.cardTemplate'),
     container: document.querySelector('.main'),
     addDialog: document.querySelector('.dialog-container'),
-    daysOfWeek: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    logoutDialog: document.querySelector('.login-out-dialog'),
+    daysOfWeek: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
   };
 
 
@@ -41,6 +42,7 @@
 
   document.getElementById('butAdd').addEventListener('click', function() {
     // Open/show the add new city dialog
+
     app.toggleAddDialog(true);
   });
 
@@ -64,7 +66,64 @@
     app.toggleAddDialog(false);
   });
 
+	document.getElementById('butLogoutCancel').addEventListener('click', function() {
+		app.logoutDialogFunc(false);
+	});
 
+	// Window code
+	var msgChan = new MessageChannel();
+
+	msgChan.port1.onmessage = function (event) {
+		console.log('Message received in page:' + event.data);
+		if (!event.data) {
+			butLogin.style.display = 'none';
+			butLogout.style.display = 'block';
+		}
+		if (event.data) {
+			butLogin.style.display = 'block';
+			butLogout.style.display = 'none';
+		}
+	}
+
+
+	//var msg2 = { action: 'login', value: false };
+	//navigator.serviceWorker.controller.postMessage(msg2, [msgChan.port2]);
+	var butLogin = document.getElementById('butLogin');
+	var butLogout = document.getElementById('butLogout');
+
+	navigator.serviceWorker.addEventListener('message', function (event) {
+		console.log(event.data)
+	})
+
+	butLogin.addEventListener('click', function() {
+		var msg = { action: 'login' };
+		console.log(navigator.serviceWorker.controller);
+		app.logoutDialogFunc(true);
+		//sendMessage(msg);
+	});
+	butLogout.addEventListener('click', function() {
+		var msg2 = { action: 'logout'};
+		console.log('test');
+		app.logoutDialogFunc(false);
+		//sendMessage(msg2);
+	});
+
+	app.logoutDialogFunc = function(loggedin) {
+		if(loggedin) {
+			butLogin.style.display = 'none';
+			butLogout.style.display = 'block';
+			app.logoutDialog.classList.add("dialog-container--visible");
+		}
+		else {
+			butLogin.style.display = 'block';
+			butLogout.style.display = 'none';
+			app.logoutDialog.classList.remove("dialog-container--visible");
+		}
+	};
+
+	function sendMessage(msg) {
+		navigator.serviceWorker.controller.postMessage(msg, [msgChan.port2]);
+	}
   /*****************************************************************************
    *
    * Methods to update/refresh the UI
@@ -369,4 +428,44 @@
 			.then(function() { console.log('Service Worker Registered'); });
 	}
 
+	var clientId = null;
+
+		  var broadcast = new SharedWorker("scripts/broadcast.js");
+	  broadcast.port.start();
+
+		  broadcast.port.addEventListener("message", function(event) {
+			    const { id, type } = event.data;
+
+				    switch (type) {
+				      case "login":
+								app.logoutDialogFunc(false);
+					        break;
+
+						      case "logout":
+						          app.logoutDialogFunc(true);
+					        break;
+
+						      case "connect":
+					        const { isLoggedIn } = event.data;
+					        	if(isLoggedIn) {
+											butLogin.style.display = 'block';
+											butLogout.style.display = 'none';
+										}
+										else {
+											butLogin.style.display = 'none';
+											butLogout.style.display = 'block';
+										}
+
+						        if (clientId === null) {
+						          clientId = id;
+						        }
+
+						        break;
+					    }
+			  });
+		  var isLoggedIn = false;
+
+		  butLogin.addEventListener("click", function(event) {
+			    broadcast.port.postMessage({ type: "changelogin", id: clientId });
+			  });
 })();
